@@ -9,4 +9,5 @@ build:
 	upx --brute dist/main
 
 deploy:
-	cd dist && now
+	cp Dockerfile dist/
+	cd dist && now --public
