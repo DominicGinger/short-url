@@ -6,8 +6,12 @@ build:
 	mkdir dist
 	GOOS=linux go build main.go
 	mv main dist/
-	upx --brute dist/main
+
+compress:
+	docker run -v $$PWD/dist:/data znly/upx --brute /data/main
 
 deploy:
 	cp Dockerfile dist/
-	cd dist && now --public
+	cd dist && now --public --name short-url
+
+prod: build compress deploy
