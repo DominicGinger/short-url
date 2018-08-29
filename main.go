@@ -33,7 +33,7 @@ func main() {
 		url := params.Get("url")
 
 		if url != "" {
-			handleSet(url, w)
+			handleSet(url, w, r)
 		} else {
 			handleGet(r.URL.Path[1:], w, r)
 		}
@@ -46,7 +46,7 @@ func main() {
 
 func handleGet(key string, w http.ResponseWriter, r *http.Request) {
 	if key == "" {
-		fmt.Fprintln(w, "Missing key, expected /key")
+		fmt.Fprintln(w, "Missing key, expected "+r.Host+"/key")
 		return
 	}
 
@@ -54,12 +54,13 @@ func handleGet(key string, w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println("Error getting data", key)
 		http.Error(w, "Error getting data", http.StatusInternalServerError)
+		return
 	}
 
 	http.Redirect(w, r, value, http.StatusSeeOther)
 }
 
-func handleSet(url string, w http.ResponseWriter) {
+func handleSet(url string, w http.ResponseWriter, r *http.Request) {
 	key := randomKey()
 
 	if !validURL(url) {
@@ -76,9 +77,11 @@ func handleSet(url string, w http.ResponseWriter) {
 	if err != nil {
 		log.Println("Error setting data", key, value)
 		http.Error(w, "Error setting data", http.StatusInternalServerError)
+		return
 	}
 
-	fmt.Fprintln(w, key)
+	response := "<a href=\"https://" + r.Host + "/" + key + "\">" + r.Host + "/" + key + "</a>"
+	fmt.Fprintln(w, response)
 }
 
 func validURL(url string) bool {
