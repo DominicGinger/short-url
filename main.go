@@ -46,7 +46,7 @@ func main() {
 
 func handleGet(key string, w http.ResponseWriter, r *http.Request) {
 	if key == "" {
-		fmt.Fprintln(w, "Missing key, expected "+r.Host+"/key")
+		fmt.Fprintln(w, "URL shortener\n"+r.Host+"?url=www.my-url.com to shorten URLs\n"+r.Host+"/my-key to go to shortened url")
 		return
 	}
 
