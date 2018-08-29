@@ -5,15 +5,14 @@ import (
     "fmt"
     "log"
     "net/http"
-
+    "time"
 )
 
 const port = "3003"
-const storageLimit = 1000
-var keys = [...]string { "the", "and", "for", "are", "but", "not", "you", "all", "any", "can", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "man", "new", "now", "old", "see", "two", "way", "who", "boy", "did", "its", "let", "put", "say", "she", "too", "use", "dad", "mom", "act", "bar", "car", "dew", "eat", "far", "gym", "hey", "ink", "jet", "key", "log", "mad", "nap", "odd", "pal", "ram", "saw", "tan", "urn", "vet", "wed", "yap", "zoo", "why", "try" }
+const storageLimit = 62*62
 
 func main() {
-    fmt.Println(len(keys))
+    rand.Seed(time.Now().UTC().UnixNano())
     data := make(map[string]string)
 
     http.HandleFunc("/set", func(w http.ResponseWriter, r *http.Request) {
@@ -47,16 +46,15 @@ func main() {
         fmt.Fprintln(w, key)
     })
 
-    http.HandleFunc("/get", func(w http.ResponseWriter, r *http.Request) {
-        params := r.URL.Query()
-        key := params.Get("key")
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        key := r.URL.Path[1:]
 
         if (key == "") {
             fmt.Fprintln(w, "Missing key param, expected ?key=x")
             return
         }
 
-        fmt.Fprintln(w, data[key])
+        http.Redirect(w, r, data[key], http.StatusSeeOther)
     })
 
     log.Println("Listening on " + port)
@@ -73,5 +71,12 @@ func validValue(value string) bool {
 }
 
 func randomKey() string {
-    return keys[rand.Intn(len(keys))]
+    letter := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+    b := make([]rune, 2)
+    for i := range b {
+        b[i] = letter[rand.Intn(len(letter))]
+    }
+    return string(b)
 }
+
