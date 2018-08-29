@@ -1,82 +1,96 @@
 package main
 
 import (
-    "math/rand"
-    "fmt"
-    "log"
-    "net/http"
-    "time"
+	"fmt"
+	"log"
+	"math/rand"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/go-redis/redis"
 )
 
 const port = "3003"
-const storageLimit = 62*62
+
+var redisClient *redis.Client
 
 func main() {
-    rand.Seed(time.Now().UTC().UnixNano())
-    data := make(map[string]string)
+	rand.Seed(time.Now().UTC().UnixNano())
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_URL"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
 
-    http.HandleFunc("/set", func(w http.ResponseWriter, r *http.Request) {
-        params := r.URL.Query()
-        key := params.Get("key")
-        value := params.Get("value")
+	_, err := redisClient.Ping().Result()
+	if err != nil {
+		log.Fatal("Unable to connect to redis")
+	}
 
-        if (key == "") {
-            key = randomKey()
-        }
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+		url := params.Get("url")
 
-        if (value == "") {
-            fmt.Fprintln(w, "Missing value param, expected ?value=y")
-            return
-        }
-        if (!validKey(key)) {
-            fmt.Fprintln(w, "Key too long, must be less than 16 chars")
-            return
-        }
-        if (!validValue(value)) {
-            fmt.Fprintln(w, "Value too long, must be less than 1000 chars")
-            return
-        }
+		if url != "" {
+			handleSet(url, w)
+		} else {
+			handleGet(r.URL.Path[1:], w, r)
+		}
+	})
 
-        if (len(data) >= storageLimit) {
-            data = make(map[string]string)
-        }
+	log.Println("Listening on " + port)
 
-        data[key] = value
-
-        fmt.Fprintln(w, key)
-    })
-
-    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        key := r.URL.Path[1:]
-
-        if (key == "") {
-            fmt.Fprintln(w, "Missing key param, expected ?key=x")
-            return
-        }
-
-        http.Redirect(w, r, data[key], http.StatusSeeOther)
-    })
-
-    log.Println("Listening on " + port)
-    err := http.ListenAndServe(":" + port, nil)
-    log.Fatal(err)
+	panic(http.ListenAndServe(":"+port, nil))
 }
 
-func validKey(key string) bool {
-    return len(key) <= 16
+func handleGet(key string, w http.ResponseWriter, r *http.Request) {
+	if key == "" {
+		fmt.Fprintln(w, "Missing key, expected /key")
+		return
+	}
+
+	value, err := redisClient.Get(key).Result()
+	if err != nil {
+		log.Println("Error getting data", key)
+		http.Error(w, "Error getting data", http.StatusInternalServerError)
+	}
+
+	http.Redirect(w, r, value, http.StatusSeeOther)
 }
 
-func validValue(value string) bool {
-    return len(value) <= 1000
+func handleSet(url string, w http.ResponseWriter) {
+	key := randomKey()
+
+	if !validURL(url) {
+		fmt.Fprintln(w, "URL too long, must be between 4 and 8000 characters")
+		return
+	}
+
+	value := url
+	if url[:4] != "http" {
+		value = "http://" + url
+	}
+
+	err := redisClient.Set(key, value, 0).Err()
+	if err != nil {
+		log.Println("Error setting data", key, value)
+		http.Error(w, "Error setting data", http.StatusInternalServerError)
+	}
+
+	fmt.Fprintln(w, key)
+}
+
+func validURL(url string) bool {
+	return len(url) <= 8000 && len(url) >= 4
 }
 
 func randomKey() string {
-    letter := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	letter := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-    b := make([]rune, 2)
-    for i := range b {
-        b[i] = letter[rand.Intn(len(letter))]
-    }
-    return string(b)
+	b := make([]rune, 3)
+	for i := range b {
+		b[i] = letter[rand.Intn(len(letter))]
+	}
+	return string(b)
 }
-
