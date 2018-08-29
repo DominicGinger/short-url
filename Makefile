@@ -12,6 +12,7 @@ compress:
 
 deploy:
 	cp Dockerfile dist/
-	cd dist && now --public --name short-url
+	cd dist && now --public --name short-url -e REDIS_URL=@short-url-redis-url -e REDIS_PASSWORD=@short-url-redis-password
 
 prod: build compress deploy
+
